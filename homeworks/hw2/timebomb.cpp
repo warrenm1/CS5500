@@ -1,55 +1,80 @@
 #include <iostream>
-#include <ctime>
 #include <mpi.h>
+#include <unistd.h>
+#include <ctime>
 
 #define MCW MPI_COMM_WORLD
 
-/*
-    This program uses MPI to simulate Time Bomb, a childhood favorite game of Dr. Watson. This game consists of a process generating the Time Bomb with a randomly initialized countdown timer, then passing the bomb to another randomly selected process. That process will decrement the timer, then pass the bomb again. Once the timer reaches zero, the bomb explodes, and the process holding the bomb is declared "The Loser". In this setting, the game will end and all processes terminate.
-*/
-int main(int argc, char** argv){
+int main(int argc, char **argv){
+    srand(time(NULL));
+
     int rank, size, data, timer;
-
     MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MCW, &rank);
-    MPI_Comm_size(MCW, &size);
+    MPI_Comm_rank(MCW, &rank); 
+    MPI_Comm_size(MCW, &size); 
 
-    srand(time(NULL) + rank);
+    int temp = rand()%size;
 
-    if (rank == rand() % size) {
-        // initialize time bomb
+    if(rank == temp) {
+        int dest = rand()%size;
+        while (dest == rank) {
+            dest = rand()%size;
+        }
+        timer = rand()%60;
+
+        std::cout << 
+        "*****************\n" <<
+        "*** Time Bomb ***\n" <<
+        "*****************\n\n";
+
+        sleep(1);
+        std::cout << timer << " seconds on the clock\n\n";
+        sleep(1);
+        std::cout << "Ready...\n";
+        sleep(1);
+        std::cout << "Set...\n";
+        sleep(1);
+        std::cout << "GO!!!\n\n";
+
+        MPI_Send(&timer, 1, MPI_INT, dest, 0, MCW);
     }
-    //     int dest = rank;
-    //     if(rand()%2)dest+=1;else dest-=1;
-    //     MPI_Send(&rank,1,MPI_INT,dest,0,MCW);
+
 
     while(1){
-        MPI_Recv(&data,1,MPI_INT,MPI_ANY_SOURCE,0,MCW,MPI_STATUS_IGNORE);
+        MPI_Recv(&data, 1, MPI_INT, MPI_ANY_SOURCE, 0, MCW, MPI_STATUS_IGNORE);
 
-        if(timer==0) {
-            std::cout << "Process " << rank << " is The Loser!!!\n";
+        if(data == -1) {
             break;
         }
 
-    //     int poisonPill=-1;
+        sleep(1);
 
-    //     if(!(rand()%8)){
-    //         cout<<"aughhhhhh!\n";
-    //         for(int i=0;i<size;++i){
-    //             MPI_Send(&poisonPill,1,MPI_INT,i,0,MCW);
-    //         }
-        
-    //     } else {
-                    
-    //         int dest = rank;
-    //         if(rand()%2)dest+=1;else dest-=1;
-    //         if(dest<0)dest=1;
-    //         if(dest>=size)dest=size-2;
-    //         MPI_Send(&rank,1,MPI_INT,dest,0,MCW);
-    //     }
-    // }
+        std::cout << "Process " << rank << ": " << data << " seconds\n";
+
+        int gameOver=-1;
+
+        if(data == 0) {
+            std::cout << 
+            "\n*********************\n" << 
+            "***** BOOOOM!!! *****\n" <<
+            "*********************\n"<< 
+            "\nProcess " << rank << " is The LOSER\n";
+            
+            for(int i=0; i<size; ++i) {
+                MPI_Send(&gameOver, 1, MPI_INT, i, 0, MCW);
+            }
+        } else {    
+            int dest = rand()%size;    
+            while (dest == rank) {
+                dest = rand()%size;
+            }
+            data--;
+            
+            MPI_Send(&data, 1, MPI_INT, dest, 0, MCW);
+        }
+    }
 
     MPI_Finalize();
 
     return 0;
-} // main
+}
